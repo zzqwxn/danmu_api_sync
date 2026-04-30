@@ -1,0 +1,50 @@
+name: Sync Upstream
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/huangxd-/danmu_api.git || true
+          git fetch upstream main
+
+      - name: Reset main to upstream
+        run: |
+          git checkout main
+          git reset --hard upstream/main
+
+      - name: Restore workflow file
+        run: |
+          git checkout ${{ github.sha }} -- .github/workflows/sync_upstream.yml
+          git add .github/workflows/sync_upstream.yml
+          if git diff --cached --quiet; then
+            echo "No workflow changes"
+          else
+            git commit -m "chore: restore sync workflow"
+          fi
+
+      - name: Force push synced main
+        run: |
+          git push origin HEAD:main --force
